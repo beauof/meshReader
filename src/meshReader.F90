@@ -1,7 +1,7 @@
 MODULE meshReader
   USE ISO_C_BINDING
   IMPLICIT NONE
-  INTEGER, PARAMETER :: INTG  = C_LONG
+  INTEGER, PARAMETER :: INTG  = C_INT
   INTEGER, PARAMETER :: DP    = C_DOUBLE
 CONTAINS
   !=============================================================================

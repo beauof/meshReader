@@ -1,6 +1,5 @@
 default:
-	mpif90 -c src/meshReader.f90 -o src/meshReader.o -Jsrc/
-	ar crv lib/libmeshReader.a src/*.o
+	mpif90 -shared src/meshReader.f90 -o lib/libmeshReader.so -fPIC -Jlib/
 
 clean:
-	rm -rf lib/*.a lib/*.so src/*.o src/*.mod
+	rm -rf lib/*.a lib/*.so lib/*.mod src/*.o

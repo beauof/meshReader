@@ -467,7 +467,7 @@ CONTAINS
             Permutation(CurrentIdx) = CurrentIdx
           END DO
         ELSE IF (VElementType=="HEX27") THEN
-          NumberOfNodesPerElement = 27 
+          NumberOfNodesPerElement = 27
           ALLOCATE(Permutation(NumberOfNodesPerElement),STAT=Err)
           IF(Err/=0) THEN
             WRITE(*,*) "Could not allocate memory."
@@ -523,7 +523,7 @@ CONTAINS
         ! Read nodes, elements, node sets
         DO i = 1, NumberOfNodes
           READ (NodeFileUnit,*) Nodes(i,:)
-        END DO 
+        END DO
         DO i = 1, NumberOfElements
           READ (ElementFileUnit,*)  IntValuesT(:)
           DO j=1,NumberOfNodesPerElement
@@ -595,11 +595,11 @@ CONTAINS
         WRITE(*,*) "Invalid element type."
         STOP
       END IF
-      ! Reading the nodes 
+      ! Reading the nodes
       ALLOCATE(Nodes(NumberOfNodes,NumberOfDimensions),STAT=Err)
       DO i = 1, NumberOfNodes
         READ (NodeFileUnit,*) Nodes(i,:)
-      END DO 
+      END DO
 
       ! Specifing number of nodes per element and interpolation type (linear/quadratic) based on element type
       IF (VElementType=="TRI3") THEN
@@ -617,8 +617,8 @@ CONTAINS
       ELSE IF (VElementType=="HEX8") THEN
         NumberOfNodesPerElement = 8
       ELSE IF (VElementType=="HEX27") THEN
-        NumberOfNodesPerElement = 27 
-      END IF      
+        NumberOfNodesPerElement = 27
+      END IF
 
       ALLOCATE(Elements(NumberOfElements,NumberOfNodesPerElement))
       DO i = 1, NumberOfElements
@@ -662,6 +662,562 @@ CONTAINS
     RETURN
 
   END SUBROUTINE ReadMesh
+
+  !
+  !=============================================================================
+  !
+  SUBROUTINE GeneratedMesh_SurfaceWeightsGet(nodalWeights,faceNumber,numberGlobalXelements, &
+    & numberGlobalYelements,numberGlobalZelements,Err)
+    ! argument variables
+    REAL(DP),       ALLOCATABLE,  INTENT(INOUT) :: nodalWeights(:)        !< on return, the consistent nodal weights
+    INTEGER(INTG),      INTENT(IN)    :: faceNumber             !< the face number
+    INTEGER(INTG),      INTENT(IN)    :: numberGlobalXelements  !< number of elements in x-direction
+    INTEGER(INTG),      INTENT(IN)    :: numberGlobalYelements  !< number of elements in y-direction
+    INTEGER(INTG),      INTENT(IN)    :: numberGlobalZelements  !< number of elements in z-direction
+    INTEGER(INTG),      INTENT(OUT)   :: Err                    !< the error code.
+    ! local variables
+    REAL(DP)      :: weight
+    INTEGER(INTG) :: node_idx,node_idx_2
+    INTEGER(INTG) :: numNodesX,numNodesY,numNodesZ,numNodesXY,numNodesXZ,numNodesYZ
+    ! the surface numbers correspond to OpenCMISS-iron face numbers!
+    INTEGER(INTG), PARAMETER :: GENERATED_MESH_REGULAR_LEFT_SURFACE   =  8
+    INTEGER(INTG), PARAMETER :: GENERATED_MESH_REGULAR_RIGHT_SURFACE  =  9
+    INTEGER(INTG), PARAMETER :: GENERATED_MESH_REGULAR_TOP_SURFACE    = 10
+    INTEGER(INTG), PARAMETER :: GENERATED_MESH_REGULAR_BOTTOM_SURFACE = 11
+    INTEGER(INTG), PARAMETER :: GENERATED_MESH_REGULAR_FRONT_SURFACE  = 12
+    INTEGER(INTG), PARAMETER :: GENERATED_MESH_REGULAR_BACK_SURFACE   = 13
+
+    ! deallocate nodal weights if already allocated
+    IF(ALLOCATED(nodalWeights)) THEN
+      DEALLOCATE(nodalWeights)
+    END IF
+
+    ! get the number of nodes in each coordinate direction
+    numNodesX     = 2 * numberGlobalXElements + 1
+    numNodesY     = 2 * numberGlobalYElements + 1
+    numNodesZ     = 2 * numberGlobalZElements + 1
+    numNodesXY    = numNodesX * numNodesY
+    numNodesXZ    = numNodesX * numNodesZ
+    numNodesYZ    = numNodesY * numNodesZ
+    ! compute the nodal weights depending on which surface we are on
+    !
+    !         template
+    !    __ __ __ __ __ __
+    !   |     |     |     |
+    !
+    !   |     |     |     |
+    !    __ __ __ __ __ __
+    !   |     |     |     |
+    !
+    !   |     |     |     |
+    !    __ __ __ __ __ __
+    !   |     |     |     |
+    !
+    !   |     |     |     |
+    !    __ __ __ __ __ __
+    !
+    SELECT CASE(faceNumber)
+      CASE(GENERATED_MESH_REGULAR_LEFT_SURFACE,GENERATED_MESH_REGULAR_RIGHT_SURFACE)
+        ! make sure that there are some nodes on this surface
+        IF((numberGlobalYElements<=0).OR.(numberGlobalZElements<=0)) THEN
+          WRITE(*,*) ">>>GeneratedMesh_SurfaceWeightsGet: There are no nodes on this surface. Face number: ",faceNumber
+          STOP
+        END IF
+        ! allocate and initialise nodal weights
+        ALLOCATE(nodalWeights(numNodesYZ))
+        nodalWeights  = 0.0_DP
+        !
+        !   X__ __ __ __ __ __X
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+
+        !   |     |     |     |
+        !   X__ __ __ __ __ __X
+        !
+        weight                                = 1.0_DP / 36.0_DP
+        nodalWeights(1)                       = weight
+        nodalWeights(numNodesY)               = weight
+        nodalWeights(numNodesYZ-numNodesY+1)  = weight
+        nodalWeights(numNodesYZ)              = weight
+        !
+        !    __ __X__ __X__ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !   X__ __ __ __ __ __X
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !   X__ __ __ __ __ __X
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __X__ __X__ __
+        !
+        weight                                = 2.0_DP / 36.0_DP
+        ! bottom
+        DO node_idx=3,numNodesY-2,2
+          nodalWeights(node_idx)  = weight
+        END DO
+        ! top
+        DO node_idx=numNodesYZ-numNodesY+3,numNodesYZ-2,2
+          nodalWeights(node_idx)  = weight
+        END DO
+        ! left/right
+        DO node_idx=2,2*numberGlobalZelements-2,2
+         nodalWeights(node_idx*numNodesY+1)   = weight
+         nodalWeights((node_idx+1)*numNodesY) = weight
+        END DO
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __X__ __X__ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __X__ __X__ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !
+        weight                                = 4.0_DP / 36.0_DP
+        DO node_idx=2,2*numberGlobalZelements-2,2
+          DO node_idx_2=node_idx*numNodesY+3,(node_idx+1)*numNodesY-2,2
+            nodalWeights(node_idx_2)  = weight
+          END DO
+        END DO
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !      X     X     X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !      X     X     X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !      X     X     X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !
+        weight                                = 4.0_DP / 9.0_DP
+        DO node_idx=1,2*numberGlobalZelements-1,2
+          DO node_idx_2=node_idx*numNodesY+2,(node_idx+1)*numNodesY-1,2
+            nodalWeights(node_idx_2)  = weight
+          END DO
+        END DO
+        !
+        !    __X__ __X__ __X__
+        !   |     |     |     |
+        !   X                 X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !   X                 X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !   X                 X
+        !   |     |     |     |
+        !    __X__ __X__ __X__
+        !
+        weight                                = 1.0_DP / 9.0_DP
+        ! top/bottom
+        DO node_idx=2,numNodesY-1,2
+          nodalWeights(node_idx)                      = weight
+          nodalWeights(numNodesYZ-numNodesY+node_idx) = weight
+        END DO
+        ! left/right
+        DO node_idx=1,2*numberGlobalZelements-1,2
+          nodalWeights(node_idx*numNodesY+1)    = weight
+          nodalWeights((node_idx+1)*numNodesY)  = weight
+        END DO
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !         X     X
+        !   |     |     |     |
+        !    __X__ __X__ __X__
+        !   |     |     |     |
+        !         X     X
+        !   |     |     |     |
+        !    __X__ __X__ __X__
+        !   |     |     |     |
+        !         X     X
+        !   |     |     |     |
+        !    __X__ __X__ __X__
+        !
+        weight                                = 2.0_DP / 9.0_DP
+        ! vertical edges
+        DO node_idx=1,2*numberGlobalZelements-1,2
+          DO node_idx_2=node_idx*numNodesY+3,(node_idx+1)*numNodesY-2,2
+            nodalWeights(node_idx_2)  = weight
+          END DO
+        END DO
+        ! horizontal edges
+        DO node_idx=2,2*numberGlobalZelements-2,2
+          DO node_idx_2=node_idx*numNodesY+2,(node_idx+1)*numNodesY-1,2
+            nodalWeights(node_idx_2)  = weight
+          END DO
+        END DO
+        ! we are done.. do a sanity check
+        IF(ABS(SUM(nodalWeights)-numberGlobalYelements*numberGlobalZelements)>1.0e-11) THEN
+          WRITE(*,*) ""
+          WRITE(*,*) "Invalid nodal weights for computing consistent nodal forces."
+          WRITE(*,*) " SIZE(nodalWeights),numNodesY,numNodesZ,SUM(nodalWeights) = ", &
+            & SIZE(nodalWeights),numNodesY,numNodesZ,SUM(nodalWeights)
+          WRITE(*,*) ""
+          DO node_idx=1,numNodesZ
+            WRITE(*,*) " ",nodalWeights(1+(node_idx-1)*numNodesY:node_idx*numNodesY:1)
+          END DO
+          WRITE(*,*) ""
+          STOP
+        END IF
+        nodalWeights=nodalWeights/SUM(nodalWeights)
+      CASE(GENERATED_MESH_REGULAR_TOP_SURFACE,GENERATED_MESH_REGULAR_BOTTOM_SURFACE)
+        ! make sure that there are some nodes on this surface
+        IF((numberGlobalXElements<=0).OR.(numberGlobalYElements<=0)) THEN
+          WRITE(*,*) ">>>GeneratedMesh_SurfaceWeightsGet: There are no nodes on this surface. Face number: ",faceNumber
+          STOP
+        END IF
+        ! allocate and initialise nodal weights
+        ALLOCATE(nodalWeights(numNodesXY))
+        nodalWeights  = 0.0_DP
+        !
+        !   X__ __ __ __ __ __X
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+
+        !   |     |     |     |
+        !   X__ __ __ __ __ __X
+        !
+        weight                                = 1.0_DP / 36.0_DP
+        nodalWeights(1)                       = weight
+        nodalWeights(numNodesX)               = weight
+        nodalWeights(numNodesXY-numNodesX+1)  = weight
+        nodalWeights(numNodesXY)              = weight
+        !
+        !    __ __X__ __X__ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !   X__ __ __ __ __ __X
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !   X__ __ __ __ __ __X
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __X__ __X__ __
+        !
+        weight                                = 2.0_DP / 36.0_DP
+        ! bottom
+        DO node_idx=3,numNodesX-2,2
+          nodalWeights(node_idx)  = weight
+        END DO
+        ! top
+        DO node_idx=numNodesXY-numNodesX+3,numNodesXY-2,2
+          nodalWeights(node_idx)  = weight
+        END DO
+        ! left/right
+        DO node_idx=2,2*numberGlobalYelements-2,2
+         nodalWeights(node_idx*numNodesX+1)   = weight
+         nodalWeights((node_idx+1)*numNodesX) = weight
+        END DO
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __X__ __X__ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __X__ __X__ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !
+        weight                                = 4.0_DP / 36.0_DP
+        DO node_idx=2,2*numberGlobalYelements-2,2
+          DO node_idx_2=node_idx*numNodesX+3,(node_idx+1)*numNodesX-2,2
+            nodalWeights(node_idx_2)  = weight
+          END DO
+        END DO
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !      X     X     X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !      X     X     X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !      X     X     X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !
+        weight                                = 4.0_DP / 9.0_DP
+        DO node_idx=1,2*numberGlobalYelements-1,2
+          DO node_idx_2=node_idx*numNodesX+2,(node_idx+1)*numNodesX-1,2
+            nodalWeights(node_idx_2)  = weight
+          END DO
+        END DO
+        !
+        !    __X__ __X__ __X__
+        !   |     |     |     |
+        !   X                 X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !   X                 X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !   X                 X
+        !   |     |     |     |
+        !    __X__ __X__ __X__
+        !
+        weight                                = 1.0_DP / 9.0_DP
+        ! top/bottom
+        DO node_idx=2,numNodesX-1,2
+          nodalWeights(node_idx)                      = weight
+          nodalWeights(numNodesXY-numNodesX+node_idx) = weight
+        END DO
+        ! left/right
+        DO node_idx=1,2*numberGlobalYelements-1,2
+          nodalWeights(node_idx*numNodesX+1)    = weight
+          nodalWeights((node_idx+1)*numNodesX)  = weight
+        END DO
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !         X     X
+        !   |     |     |     |
+        !    __X__ __X__ __X__
+        !   |     |     |     |
+        !         X     X
+        !   |     |     |     |
+        !    __X__ __X__ __X__
+        !   |     |     |     |
+        !         X     X
+        !   |     |     |     |
+        !    __X__ __X__ __X__
+        !
+        weight                                = 2.0_DP / 9.0_DP
+        ! vertical edges
+        DO node_idx=1,2*numberGlobalYelements-1,2
+          DO node_idx_2=node_idx*numNodesX+3,(node_idx+1)*numNodesX-2,2
+            nodalWeights(node_idx_2)  = weight
+          END DO
+        END DO
+        ! horizontal edges
+        DO node_idx=2,2*numberGlobalYelements-2,2
+          DO node_idx_2=node_idx*numNodesX+2,(node_idx+1)*numNodesX-1,2
+            nodalWeights(node_idx_2)  = weight
+          END DO
+        END DO
+        ! we are done.. do a sanity check
+        IF(ABS(SUM(nodalWeights)-numberGlobalXelements*numberGlobalYelements)>1.0e-11) THEN
+          WRITE(*,*) ""
+          WRITE(*,*) "Invalid nodal weights for computing consistent nodal forces."
+          WRITE(*,*) " SIZE(nodalWeights),numNodesX,numNodesY,SUM(nodalWeights) = ", &
+            & SIZE(nodalWeights),numNodesX,numNodesY,SUM(nodalWeights)
+          WRITE(*,*) ""
+          DO node_idx=1,numNodesY
+            WRITE(*,*) " ",nodalWeights(1+(node_idx-1)*numNodesX:node_idx*numNodesX:1)
+          END DO
+          WRITE(*,*) ""
+          STOP
+        END IF
+        nodalWeights=nodalWeights/SUM(nodalWeights)
+      CASE(GENERATED_MESH_REGULAR_FRONT_SURFACE,GENERATED_MESH_REGULAR_BACK_SURFACE)
+        ! make sure that there are some nodes on this surface
+        IF((numberGlobalXElements<=0).OR.(numberGlobalZElements<=0)) THEN
+          WRITE(*,*) ">>>GeneratedMesh_SurfaceWeightsGet: There are no nodes on this surface. Face number: ",faceNumber
+          STOP
+        END IF
+        ! allocate and initialise nodal weights
+        ALLOCATE(nodalWeights(numNodesXZ))
+        nodalWeights  = 0.0_DP
+        !
+        !   X__ __ __ __ __ __X
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+
+        !   |     |     |     |
+        !   X__ __ __ __ __ __X
+        !
+        weight                                = 1.0_DP / 36.0_DP
+        nodalWeights(1)                       = weight
+        nodalWeights(numNodesX)               = weight
+        nodalWeights(numNodesXZ-numNodesX+1)  = weight
+        nodalWeights(numNodesXZ)              = weight
+        !
+        !    __ __X__ __X__ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !   X__ __ __ __ __ __X
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !   X__ __ __ __ __ __X
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __X__ __X__ __
+        !
+        weight                                = 2.0_DP / 36.0_DP
+        ! bottom
+        DO node_idx=3,numNodesX-2,2
+          nodalWeights(node_idx)  = weight
+        END DO
+        ! top
+        DO node_idx=numNodesXZ-numNodesX+3,numNodesXZ-2,2
+          nodalWeights(node_idx)  = weight
+        END DO
+        ! left/right
+        DO node_idx=2,2*numberGlobalZelements-2,2
+         nodalWeights(node_idx*numNodesX+1)   = weight
+         nodalWeights((node_idx+1)*numNodesX) = weight
+        END DO
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __X__ __X__ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __X__ __X__ __
+        !   |     |     |     |
+        !
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !
+        weight                                = 4.0_DP / 36.0_DP
+        DO node_idx=2,2*numberGlobalZelements-2,2
+          DO node_idx_2=node_idx*numNodesX+3,(node_idx+1)*numNodesX-2,2
+            nodalWeights(node_idx_2)  = weight
+          END DO
+        END DO
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !      X     X     X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !      X     X     X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !      X     X     X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !
+        weight                                = 4.0_DP / 9.0_DP
+        DO node_idx=1,2*numberGlobalZelements-1,2
+          DO node_idx_2=node_idx*numNodesX+2,(node_idx+1)*numNodesX-1,2
+            nodalWeights(node_idx_2)  = weight
+          END DO
+        END DO
+        !
+        !    __X__ __X__ __X__
+        !   |     |     |     |
+        !   X                 X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !   X                 X
+        !   |     |     |     |
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !   X                 X
+        !   |     |     |     |
+        !    __X__ __X__ __X__
+        !
+        weight                                = 1.0_DP / 9.0_DP
+        ! top/bottom
+        DO node_idx=2,numNodesX-1,2
+          nodalWeights(node_idx)                      = weight
+          nodalWeights(numNodesXZ-numNodesX+node_idx) = weight
+        END DO
+        ! left/right
+        DO node_idx=1,2*numberGlobalZelements-1,2
+          nodalWeights(node_idx*numNodesX+1)    = weight
+          nodalWeights((node_idx+1)*numNodesX)  = weight
+        END DO
+        !    __ __ __ __ __ __
+        !   |     |     |     |
+        !         X     X
+        !   |     |     |     |
+        !    __X__ __X__ __X__
+        !   |     |     |     |
+        !         X     X
+        !   |     |     |     |
+        !    __X__ __X__ __X__
+        !   |     |     |     |
+        !         X     X
+        !   |     |     |     |
+        !    __X__ __X__ __X__
+        !
+        weight                                = 2.0_DP / 9.0_DP
+        ! vertical edges
+        DO node_idx=1,2*numberGlobalZelements-1,2
+          DO node_idx_2=node_idx*numNodesX+3,(node_idx+1)*numNodesX-2,2
+            nodalWeights(node_idx_2)  = weight
+          END DO
+        END DO
+        ! horizontal edges
+        DO node_idx=2,2*numberGlobalZelements-2,2
+          DO node_idx_2=node_idx*numNodesX+2,(node_idx+1)*numNodesX-1,2
+            nodalWeights(node_idx_2)  = weight
+          END DO
+        END DO
+        ! we are done.. do a sanity check
+        IF(ABS(SUM(nodalWeights)-numberGlobalXelements*numberGlobalZelements)>1.0e-11) THEN
+          WRITE(*,*) ""
+          WRITE(*,*) "Invalid nodal weights for computing consistent nodal forces."
+          WRITE(*,*) " SIZE(nodalWeights),numNodesX,numNodesY,SUM(nodalWeights) = ", &
+            & SIZE(nodalWeights),numNodesX,numNodesZ,SUM(nodalWeights)
+          WRITE(*,*) ""
+          DO node_idx=1,numNodesZ
+            WRITE(*,*) " ",nodalWeights(1+(node_idx-1)*numNodesX:node_idx*numNodesX:1)
+          END DO
+          WRITE(*,*) ""
+          STOP
+        END IF
+        nodalWeights=nodalWeights/SUM(nodalWeights)
+      CASE DEFAULT
+        WRITE(*,*) "Not implemented: Face number ",faceNumber
+        STOP
+    END SELECT
+
+  END SUBROUTINE GeneratedMesh_SurfaceWeightsGet
 
   !
   !=============================================================================

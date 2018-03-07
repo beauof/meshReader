@@ -19,6 +19,15 @@ Further mesh formats, interpolation orders and mesh types will follow, e.g.,
 2. UGRID file format
 3. VTK file format
 
+## Utilities
+
+This library also adds some convenience functions for dealing with meshes.
+For example,
+
+1. GeneratedMesh_SurfaceWeightsGet - This function computes the nodal weights required to apply consistent nodal forces.
+2. ImportedMesh_SurfaceGet - This function gets all the nodes associated with a patch ID for imported meshes.
+  * Note: So far, only for CHeart mesh files.
+
 ## Installation
 
 Simply run the following commands:

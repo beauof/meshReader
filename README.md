@@ -27,6 +27,7 @@ For example,
 1. GeneratedMesh_SurfaceWeightsGet - This function computes the nodal weights required to apply consistent nodal forces.
 2. ImportedMesh_SurfaceGet - This function gets all the nodes associated with a patch ID for imported meshes.
   * Note: So far, only for CHeart mesh files.
+3. ImportedMesh_SurfaceWeightsGet - This function computes the nodal weights required to apply consistent nodal forces.
 
 ## Installation
 

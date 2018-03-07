@@ -666,6 +666,36 @@ CONTAINS
   !
   !=============================================================================
   !
+  SUBROUTINE ImportedMesh_SurfaceWeightsGet(nodalWeights,numNodesPerElement,Err)
+    ! argument variables
+    REAL(DP),       ALLOCATABLE,  INTENT(INOUT) :: nodalWeights(:)      !< on return, the consistent nodal weights
+    INTEGER(INTG),                INTENT(IN)    :: numNodesPerElement   !< the number of nodes of surface element
+    INTEGER(INTG),                INTENT(OUT)   :: Err                  !< the error code.
+
+    SELECT CASE(numNodesPerElement)
+      ! tri-quadratic hexahedron
+      CASE(27)
+        IF(ALLOCATED(nodalWeights)) DEALLOCATE(nodalWeights)
+        ! note: surface element has 9 nodes
+        ALLOCATE(nodalWeights(9))
+        nodalWeights(1) = 1.0_DP / 36.0_DP
+        nodalWeights(5) = 1.0_DP /  9.0_DP
+        nodalWeights(2) = 1.0_DP / 36.0_DP
+        nodalWeights(6) = 1.0_DP /  9.0_DP
+        nodalWeights(7) = 4.0_DP /  9.0_DP
+        nodalWeights(8) = 1.0_DP /  9.0_DP
+        nodalWeights(3) = 1.0_DP / 36.0_DP
+        nodalWeights(9) = 1.0_DP /  9.0_DP
+        nodalWeights(4) = 1.0_DP / 36.0_DP
+      CASE DEFAULT
+        WRITE(*,*) "Not implemented."
+    END SELECT
+
+  END SUBROUTINE ImportedMesh_SurfaceWeightsGet
+
+  !
+  !=============================================================================
+  !
   SUBROUTINE GeneratedMesh_SurfaceWeightsGet(nodalWeights,faceNumber,numberGlobalXelements, &
     & numberGlobalYelements,numberGlobalZelements,Err)
     ! argument variables
